@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .quiz-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 50vw; /* Cover half of the viewport width */
+            height: 100vh; /* Full viewport height */
+            position: absolute; /* Use absolute positioning */
+            left: 0; /* Align to the left */
+            top: 0; /* Align to the top */
+            overflow-y: auto; /* Enable scrolling if content overflows */
+        }
+        .hidden {
+            display: none;
+        }
+        .question-container {
+            margin-bottom: 20px;
+        }
+        .timer {
+            font-size: 18px;
+            position: absolute;
+            right: 20px;
+            top: 10px;
+        }
+        .current-question {
+            font-size: 18px;
+            position: absolute;
+            right: 20px;
+            top: 40px; /* Positioned below the timer */
+        }
+        .option-button {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            cursor: pointer;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 15px;
+            background: #f9f9f9;
+            transition: background-color 0.2s;
+            width: 90%;
+        }
+        .option-button:hover {
+            background-color: #e6e6e6;
+        }
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .button-container button {
+            flex: 1;
+            margin: 0 5px;
+        }
+        .next-btn {
+            background-color: blue;
+            color: white;
+        }
+        .submit-btn {
+            background-color: red;
+            color: white;
+        }
+        .restart-btn {
+            background-color: yellow;
+            color: black;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .question-number {
+            font-weight: bold;
+            margin-bottom: 10px; /* Space between question and options */
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>Quiz App</h1>
+        <div class="header">
+            <div class="timer" id="timer">Time Left: 30:00</div>
+            <div id="current-question" class="current-question">1 / 4</div> <!-- Current question display -->
+        </div>
+        <div class="question-container">
+            <div id="question-text" class="question-number">Loading question...</div>
+            <div id="options"></div>
+            <div class="button-container">
+                <button id="next-btn" class="hidden option-button next-btn">Next Question</button>
+                <button id="restart-btn" class="hidden option-button restart-btn">Restart Quiz</button>
+                <button id="submit-btn" class="hidden option-button submit-btn">Submit Quiz</button>
+            </div>
+        </div>
+        <button id="review-btn" class="hidden option-button review-btn">Review Incorrect and Unattempted Questions</button>
+        <div class="score-section hidden" id="score-section"></div>
+        <div class="review-section hidden" id="review-section">
+            <h3>Review Incorrect and Unattempted Questions</h3>
+            <ul id="review-list"></ul>
+            <button id="close-review-btn" class="option-button">Close Review</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            {
+                question: "(143 − 482)% of 80 = 6x + 40% of 145",
+                options: ["45", "53", "51", "49", "47"],
+                answer: "49"
+            },
+            {
+                question: "11 + 111 + 1111 + 1 + 11 = 15x",
+                options: ["99", "63", "73", "83", "93"],
+                answer: "83"
+            },
+            {
+                question: "(18 × 25) + 56×54 / 16×27 + x = 441",
+                options: ["-17", "-13", "-14", "-15", "-16"],
+                answer: "-16"
+            },
+            {
+                question: "√1.96 + √0.0036 + √7.29 = x + √0.64",
+                options: ["3.56", "3.96", "3.36", "3.26", "3.16"],
+                answer: "3.36"
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let selectedAnswers = [];
+        let score = 0;
+        let timerInterval;
+        let totalQuizTime = 1800; // 30 minutes in seconds
+        const incorrectAnswers = [];
+
+        const timerElement = document.getElementById('timer');
+        const questionTextElement = document.getElementById('question-text');
+        const optionsElement = document.getElementById('options');
+        const nextBtn = document.getElementById('next-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const reviewBtn = document.getElementById('review-btn');
+        const scoreSection = document.getElementById('score-section');
+        const reviewSection = document.getElementById('review-section');
+        const reviewList = document.getElementById('review-list');
+        const closeReviewBtn = document.getElementById('close-review-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const currentQuestionElement = document.getElementById('current-question');
+
+        // Initialize the quiz
+        function startQuiz() {
+            currentQuestionIndex = 0; // Reset question index
+            selectedAnswers = [];
+            score = 0;
+            loadQuestion();
+            startTimer();
+            reviewSection.classList.add('hidden'); // Hide review section on restart
+        }
+
+        // Load a question
+        function loadQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionTextElement.innerHTML = `<strong>${currentQuestionIndex + 1}. ${question.question}</strong>`;
+            optionsElement.innerHTML = '';
+
+            question.options.forEach((option) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('option-button');
+                button.addEventListener('click', () => selectAnswer(option));
+                optionsElement.appendChild(button);
+            });
+
+            nextBtn.classList.add('hidden');
+            currentQuestionElement.textContent = `${currentQuestionIndex + 1} / ${questions.length}`; // Update current question
+        }
+
+        // Select an answer
+        function selectAnswer(selectedOption) {
+            const question = questions[currentQuestionIndex];
+
+            // Allow only one selection
+            if (!selectedAnswers[currentQuestionIndex]) {
+                selectedAnswers[currentQuestionIndex] = selectedOption;
+                const optionButtons = optionsElement.getElementsByTagName('button');
+
+                for (let button of optionButtons) {
+                    if (button.textContent === selectedOption) {
+                        button.style.backgroundColor = 'lightblue'; // Highlight selected option
+                    } else {
+                        button.disabled = true; // Disable other options
+                    }
+                }
+
+                if (selectedOption === question.answer) {
+                    score += 1; // Correct answer
+                } else {
+                    score -= 0.25; // Incorrect answer
+                    incorrectAnswers.push(currentQuestionIndex); // Track incorrect answer for review
+                }
+
+                nextBtn.classList.remove('hidden');
+            }
+        }
+
+        // Go to the next question
+        nextBtn.addEventListener('click', () => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                submitBtn.classList.remove('hidden');
+            }
+        });
+
+        // Start the quiz timer
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                totalQuizTime--;
+                const minutes = Math.floor(totalQuizTime / 60);
+                const seconds = totalQuizTime % 60;
+                timerElement.textContent = `Time Left: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                if (totalQuizTime <= 0) {
+                    clearInterval(timerInterval); // Stop timer
+                    alert("Time's up!");
+                    submitBtn.click(); // Automatically submit the quiz
+                }
+            }, 1000);
+        }
+
+        // Show the score
+        submitBtn.addEventListener('click', () => {
+            clearInterval(timerInterval); // Stop the timer
+            scoreSection.textContent = `Your Score: ${score.toFixed(2)} out of ${questions.length}`;
+            scoreSection.classList.remove('hidden');
+            submitBtn.classList.add('hidden');
+            restartBtn.classList.remove('hidden'); // Show restart button
+
+            // Show review button if there are incorrect answers
+            if (incorrectAnswers.length > 0 || selectedAnswers.length < questions.length) {
+                reviewBtn.classList.remove('hidden');
+            }
+        });
+
+        // Show review section
+        reviewBtn.addEventListener('click', () => {
+            reviewSection.classList.remove('hidden');
+            reviewList.innerHTML = '';
+
+            questions.forEach((question, index) => {
+                const listItem = document.createElement('li');
+                const reviewButton = document.createElement('button');
+                reviewButton.textContent = 'Review';
+                reviewButton.classList.add('option-button');
+
+                // Adjust review button behavior
+                reviewButton.addEventListener('click', () => {
+                    currentQuestionIndex = index; // Set current question index
+                    loadQuestion();
+                    reviewSection.classList.add('hidden'); // Hide review section
+                });
+
+                // Determine if the question was unattempted or incorrect
+                if (selectedAnswers[index] === undefined) {
+                    listItem.textContent = `Unattempted: `;
+                } else if (selectedAnswers[index] !== question.answer) {
+                    listItem.textContent = `Incorrect: `;
+                } else {
+                    return; // Skip correct answers
+                }
+                listItem.appendChild(reviewButton);
+                reviewList.appendChild(listItem);
+            });
+        });
+
+        // Close review section
+        closeReviewBtn.addEventListener('click', () => {
+            reviewSection.classList.add('hidden');
+        });
+
+        // Restart the quiz
+        restartBtn.addEventListener('click', () => {
+            scoreSection.classList.add('hidden');
+            restartBtn.classList.add('hidden');
+            reviewBtn.classList.add('hidden');
+            totalQuizTime = 1800; // Reset time
+            startQuiz(); // Start quiz again
+        });
+
+        // Start the quiz when the page loads
+        startQuiz();
+    </script>
+</body>
+</html>
